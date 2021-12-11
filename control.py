@@ -4,53 +4,53 @@
 from __future__ import division
 import os, sys
 if os.name in ('posix', 'nt', 'os2', 'ce', 'riscos'):
-    import pygame
+    import pygame as pg
     platform = 'pc'
 elif os.name == 'java':
     import pyj2d
-    sys.modules['pygame'] = pyj2d
-    pygame = pyj2d
+    sys.modules['pg'] = pyj2d
+    pg = pyj2d
     platform = 'jvm'
 else:
-    import pyjsdl as pygame
+    import pyjsdl as pg
     platform = 'js'
-Color = pygame.Color
+Color = pg.Color
 
 
 class App(object):
 
-    def __init__(self, function):
-        self._fn = function
+    def __init__(self, fn):
+        self._fn = fn
         self.quit = False
         if platform == 'js':
             self.run = self.run_js
             self.set_function = self.set_function_js
 
-    def set_function(self, function):
-        self._fn = function
+    def set_function_pc(self, fn):
+        self._fn = fn
 
-    def set_function_js(self, function):
-        self._fn = function
-        pygame.display.setup(self._fn)
+    def set_function_js(self, fn):
+        self._fn = fn
+        pg.set_callback(self._fn)
 
     def run(self):
         while not self.quit:
             self._fn()
 
     def run_js(self):
-        pygame.display.setup(self._fn)
+        pg.set_callback(self._fn)
 
     def terminate(self):
         self.quit = True
-        pygame.quit()
+        pg.quit()
 
 
 class Control(object):
 
     def __init__(self, matrix):
         self.matrix = matrix
-        self.clock = pygame.time.Clock()
-        pygame.event.set_blocked(pygame.MOUSEMOTION)
+        self.clock = pg.time.Clock()
+        pg.event.set_blocked(pg.MOUSEMOTION)
         self.waiting = False
         pointer_cursor, wait_cursor = self.set_cursor()
         self.cursor = {False:pointer_cursor, True:wait_cursor}
@@ -58,24 +58,29 @@ class Control(object):
         self.quit = False
 
     def check_control(self):
-        if not pygame.event.peek():
+        if not pg.event.peek():
             return self.quit
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
+        for event in pg.event.get():
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_r:
                     self.matrix.restart()
-                elif event.key == pygame.K_SPACE:
-                    self.matrix.repeat = True
-                elif event.key == pygame.K_ESCAPE:
+                elif event.key == pg.K_ESCAPE:
                     self.quit = True
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_SPACE:
-                    self.matrix.repeat = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     if not self.waiting:
                         self.matrix.biomorph_select(event.pos)
-            elif event.type == pygame.QUIT:
+                        if pg.key.get_mods() & pg.KMOD_SHIFT:
+                            self.matrix.repeat = True
+                elif event.button == 3:
+                    if not self.waiting:
+                        if pg.key.get_mods() & pg.KMOD_SHIFT:
+                            self.matrix.restart()
+            elif event.type == pg.MOUSEBUTTONUP:
+                if event.button == 1:
+                    if self.matrix.repeat:
+                        self.matrix.repeat = False
+            elif event.type == pg.QUIT:
                 self.quit = True
         return self.quit
 
@@ -133,13 +138,13 @@ class Control(object):
               "                        ",
               "                        ",
             )
-            curs, mask = pygame.cursors.compile(pointer_cursor_strings, 'X', '.')
+            curs, mask = pg.cursors.compile(pointer_cursor_strings, 'X', '.')
             pointer_cursor = ((24, 24), (0, 1), curs, mask)
-            curs, mask = pygame.cursors.compile(wait_cursor_strings, 'X', '.')
+            curs, mask = pg.cursors.compile(wait_cursor_strings, 'X', '.')
             wait_cursor =  ((24, 24), (4, 2), curs, mask)
         elif platform == 'jvm':
-            pointer_cursor = pygame.cursors.HAND_CURSOR
-            wait_cursor = pygame.cursors.WAIT_CURSOR
+            pointer_cursor = pg.cursors.HAND_CURSOR
+            wait_cursor = pg.cursors.WAIT_CURSOR
         elif platform == 'js':
             pointer_cursor = 'pointer'
             wait_cursor = 'wait'
@@ -148,9 +153,9 @@ class Control(object):
     def set_wait(self, setting):
         self.waiting = setting
         if platform == 'pc':
-            pygame.mouse.set_cursor(*self.cursor[self.waiting])
+            pg.mouse.set_cursor(*self.cursor[self.waiting])
         else:
-            pygame.mouse.set_cursor(self.cursor[self.waiting])
+            pg.mouse.set_cursor(self.cursor[self.waiting])
         return None
 
     def update(self):
@@ -163,8 +168,8 @@ class Renderer(object):
 
     def __init__(self, matrix):
         self.matrix = matrix
-        self.screen = pygame.display.get_surface()
-        self.background = pygame.Surface(self.screen.get_size())
+        self.screen = pg.display.get_surface()
+        self.background = pg.Surface(self.screen.get_size())
         self.background.fill(self.matrix.screen_color)
         self.screen.blit(self.background, (0,0))
         if platform == 'js':
@@ -173,7 +178,7 @@ class Renderer(object):
         self.rect_list = [self.rect]
         self.point_cache = PointCache()
         if platform in ('js','jvm'):
-            pygame.draw.set_return(False)
+            pg.draw.set_return(False)
         self.update()
 
     def render(self, biomorph, pos):
@@ -193,7 +198,7 @@ class Renderer(object):
             pt1[1] = y1[i]//z+y
             pt2[0] = x2[i]//z+x
             pt2[1] = y2[i]//z+y
-            pygame.draw.aaline(image, color, pt1, pt2)
+            pg.draw.aaline(image, color, pt1, pt2)
         image.unlock()
         self.point_cache.set(pt1)
         self.point_cache.set(pt2)
@@ -205,7 +210,7 @@ class Renderer(object):
     def draw_grid(self, grid, size, color):
         self.background.fill(self.matrix.screen_color)
         for pos in grid:
-            pygame.draw.rect(self.background, color, (pos[0],pos[1],size[0],size[1]), 1)
+            pg.draw.rect(self.background, color, (pos[0],pos[1],size[0],size[1]), 1)
         self.screen.blit(self.background, (0,0))
         self.rect_list = [self.rect]
 
@@ -218,17 +223,17 @@ class Renderer(object):
         self.update()
 
     def update(self):
-        pygame.display.update()
+        pg.display.update()
 
 
 class Config(object):
 
     def setup(self, w,h):
-        pygame.init()
-        pygame.display.set_mode((w,h))
-        pygame.display.set_caption('Biomorph Evolve')
+        pg.init()
+        pg.display.set_mode((w,h))
+        pg.display.set_caption('Biomorph Evolve')
         if platform != 'js':
-            pygame.display.set_icon(pygame.image.load('icon.png'))
+            pg.display.set_icon(pg.image.load('icon.png'))
 
 
 class RectCache(object):
@@ -244,7 +249,7 @@ class RectCache(object):
             rect.width = w
             rect.height = h
         else:
-            rect = pygame.Rect(x,y,w,h)
+            rect = pg.Rect(x,y,w,h)
         return rect
 
     def set(self, rect):

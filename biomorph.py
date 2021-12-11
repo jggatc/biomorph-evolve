@@ -15,7 +15,7 @@ Copyright (C) 2017 James Garnon
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Biomorph Evolve version 1.0
 Download Site: https://gatc.ca
@@ -76,7 +76,8 @@ class Matrix(object):
             if not self.biomorph_selected:
                 biomorph.deinit()
             else:
-                biomorph.segments.idx = 0
+                if biomorph.segments is not None:
+                    biomorph.segments.idx = 0
         self.biomorph[:] = []
 
     def reproduce(self, biomorph):
