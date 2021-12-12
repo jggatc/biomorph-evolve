@@ -1,17 +1,24 @@
 #Biomorph Evolve - Copyright (C) 2017
 #Released under the GPL3 License
 
+# __pragma__ ('skip')
 from __future__ import division
-import os, sys
+# __pragma__ ('noskip')
+
+platform = None
+# __pragma__ ('skip')
+import os
 if os.name in ('posix', 'nt', 'os2', 'ce', 'riscos'):
     import pygame as pg
     platform = 'pc'
 elif os.name == 'java':
-    import pyj2d
-    sys.modules['pg'] = pyj2d
-    pg = pyj2d
+    import pyj2d as pg
     platform = 'jvm'
 else:
+    import pyjsdl as pg
+    platform = 'js'
+# __pragma__ ('noskip')
+if platform is None:
     import pyjsdl as pg
     platform = 'js'
 Color = pg.Color
@@ -22,7 +29,10 @@ class App(object):
     def __init__(self, fn):
         self._fn = fn
         self.quit = False
-        if platform == 'js':
+        if platform in ('pc', 'jvm'):
+            self.run = self.run_pc
+            self.set_function = self.set_function_pc
+        elif platform == 'js':
             self.run = self.run_js
             self.set_function = self.set_function_js
 
@@ -33,7 +43,7 @@ class App(object):
         self._fn = fn
         pg.set_callback(self._fn)
 
-    def run(self):
+    def run_pc(self):
         while not self.quit:
             self._fn()
 
@@ -55,6 +65,9 @@ class Control(object):
         pointer_cursor, wait_cursor = self.set_cursor()
         self.cursor = {False:pointer_cursor, True:wait_cursor}
         self.set_wait(False)
+        if platform == 'js':
+            handler = TouchHandler()
+            pg.env.event.touchlistener.add_callback(handler)
         self.quit = False
 
     def check_control(self):
@@ -80,6 +93,9 @@ class Control(object):
                 if event.button == 1:
                     if self.matrix.repeat:
                         self.matrix.repeat = False
+            elif event.type == pg.ACTIVEEVENT:
+                if event.state == 2:
+                    self.matrix.refresh()
             elif event.type == pg.QUIT:
                 self.quit = True
         return self.quit
@@ -164,6 +180,42 @@ class Control(object):
         return quit
 
 
+class TouchHandler(object):
+
+    def __init__(self):
+        self.pos = {'x':0, 'y':0}
+
+    def onTouchStart(self, event):
+        touch = event.touches.item(0)
+        r = pg.env.canvas.getElement().getBoundingClientRect()
+        x = touch.clientX-round(r.left)
+        y = touch.clientY-round(r.top)
+        evt = pg.event.Event(pg.MOUSEBUTTONDOWN,
+                     {'button':1, 'pos':(x,y)})
+        pg.event.post(evt)
+        self.pos['x'] = touch.clientX
+        self.pos['y'] = touch.clientY
+        if event.cancelable:
+            event.preventDefault()
+
+    def onTouchEnd(self, event):
+        if event.cancelable:
+            event.preventDefault()
+
+    def onTouchMove(self, event):
+        touch = event.touches.item(0)
+        x = touch.clientX
+        y = touch.clientY
+        if abs(x-self.pos['x']) < 100 and (y-self.pos['y']) > 200:
+            self.pos['x'] = x
+            self.pos['y'] = y
+            evt = pg.event.Event(pg.KEYDOWN, {'key':pg.K_r})
+            pg.event.post(evt)
+
+    def onTouchCancel(self, event):
+        pass
+
+
 class Renderer(object):
 
     def __init__(self, matrix):
@@ -242,7 +294,7 @@ class RectCache(object):
         self._cache = []
 
     def get(self, x, y, w, h):
-        if self._cache:
+        if len(self._cache) > 0:
             rect = self._cache.pop()
             rect.x = x
             rect.y = y
@@ -262,7 +314,7 @@ class ListCache(object):
         self._cache = []
 
     def get(self, x, y):
-        if self._cache:
+        if len(self._cache) > 0:
             lst = self._cache.pop()
             lst[0] = x
             lst[1] = y
@@ -277,7 +329,7 @@ class ListCache(object):
 class PointCache(ListCache):
 
     def get(self):
-        if self._cache:
+        if len(self._cache) > 0:
             return self._cache.pop()
         else:
             return [0,0]
@@ -290,7 +342,7 @@ class DictCache(object):
         self._cache = []
 
     def get(self):
-        if self._cache:
+        if len(self._cache) > 0:
             d = self._cache.pop()
         else:
             d = {}

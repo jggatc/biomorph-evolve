@@ -17,13 +17,19 @@ Copyright (C) 2017 James Garnon
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Biomorph Evolve version 1.0
+Biomorph Evolve version 1.1
 Download Site: https://gatc.ca
 """
 
+# __pragma__ ('skip')
 from __future__ import division
+# __pragma__ ('noskip')
 import random
 from control import App, Control, Config, DictCache, ListCache, RectCache, Renderer, Color
+
+
+if not hasattr(random, 'randrange'):
+    random.randrange = lambda i,f: random.choice(range(i,f))
 
 
 size = 200
@@ -109,12 +115,15 @@ class Matrix(object):
         self.init()
         self.renderer.update()
 
+    def refresh(self):
+        self.renderer.update()
+
     def terminate(self):
         self.renderer.blank()
         self.prune()
 
     def update(self):
-        if self.biomorph_selected:
+        if self.biomorph_selected is not None:
             if not self.reset:
                 self.control.set_wait(True)
                 self.renderer.clear()
@@ -143,10 +152,10 @@ class Biomorph(object):
 
     def __init__(self, genes=None):
         self.genes = dict_cache.get()
-        if genes:
-            for i in genes:
+        if genes is not None:
+            for i in genes.keys():
                 self.genes[i] = genes[i]
-            i = random.choice(self.genes.keys())
+            i = random.choice(list(self.genes.keys()))
             self.genes[i] += random.choice([-1,1])
             if self.genes[i] < genome[i][0]:
                 self.genes[i] = genome[i][0] + 1
@@ -252,7 +261,7 @@ class Segment(object):
         return x, y, adj
 
     def get_list(self):
-        if self._cache:
+        if len(self._cache) > 0:
             return self._cache.pop()
         else:
             return [0 for i in range(2**(gene['ln'][1]+1))]
